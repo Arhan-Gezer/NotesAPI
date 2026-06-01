@@ -2,6 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using NotesAPI.Models;
 using Quartz;
 using NotesAPI.Jobs;
+using NotesAPI.Repositories;
+using Microsoft.Extensions.Options;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -52,7 +55,15 @@ builder.Services.AddAuthentication("Bearer")
     });
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-   options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")!));
+{
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+    if (connectionString!.Contains("Data Source"))
+        options.UseSqlite(connectionString);
+    else
+        options.UseSqlServer(connectionString);
+});
+
+builder.Services.AddScoped<INoteRepository, NoteRepository>();
 
 builder.Services.AddQuartz(q =>
 {
@@ -73,25 +84,34 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    var retries = 10;
-    while (retries > 0)
+    var connectionString = app.Configuration.GetConnectionString("DefaultConnection");
+
+    if (connectionString!.Contains("Data Source"))
     {
-        try
+        db.Database.Migrate();
+    }
+    else
+    {
+        var retries = 10;
+        while (retries > 0)
         {
-            db.Database.Migrate();
-            break;
-        }
-        catch
-        {
-            retries--;
-            Console.WriteLine($"SQL Server hazýr deðil, bekleniyor... ({retries} deneme kaldý)");
-            Thread.Sleep(3000);
+            try
+            {
+                db.Database.Migrate();
+                break;
+            }
+            catch
+            {
+                retries--;
+                Console.WriteLine($"SQL Server hazýr deðil, bekleniyor... ({retries} deneme kaldý)");
+                Thread.Sleep(3000);
+            }
         }
     }
 }
 
 app.UseSwagger();
-    app.UseSwaggerUI();
+app.UseSwaggerUI();
 
 
 app.UseHttpsRedirection();

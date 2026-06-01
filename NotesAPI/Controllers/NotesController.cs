@@ -1,30 +1,37 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using NotesAPI.Models;
+using NotesAPI.Repositories;
 using System.Text;
 using System.Text.Json;
-using Microsoft.AspNetCore.Authorization;
 
 namespace NotesAPI.Controllers
 {
-    
     [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class NotesController : ControllerBase
     {
-        private readonly AppDbContext _db;
+        private readonly INoteRepository _noteRepository;
 
-        public NotesController(AppDbContext db)
+        public NotesController(INoteRepository noteRepository)
         {
-            _db = db;
+            _noteRepository = noteRepository;
         }
 
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var notes = await _db.Notes.ToListAsync();
+            var notes = await _noteRepository.GetAllAsync();
             return Ok(notes);
+        }
+
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(int id)
+        {
+            var note = await _noteRepository.GetByIdAsync(id);
+            if (note == null) return NotFound();
+            return Ok(note);
         }
 
         [HttpPost]
@@ -36,39 +43,28 @@ namespace NotesAPI.Controllers
             if (string.IsNullOrWhiteSpace(note.Content))
                 return BadRequest("Content boş olamaz.");
 
-            _db.Notes.Add(note);
-            await _db.SaveChangesAsync();
-            return Ok(note);
-        }
-
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetById(int id)
-        {
-            var note = await _db.Notes.FindAsync(id);
-            if (note == null) return NotFound();
-            return Ok(note);
+            var created = await _noteRepository.CreateAsync(note);
+            return Ok(created);
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var note = await _db.Notes.FindAsync(id);
-            if (note == null) return NotFound();
-            _db.Notes.Remove(note);
-            await _db.SaveChangesAsync();
+            var result = await _noteRepository.DeleteAsync(id);
+            if (!result) return NotFound();
             return Ok();
         }
 
         [HttpGet("{id}/summary")]
         public async Task<IActionResult> GetSummary(int id)
         {
-            var note = await _db.Notes.FindAsync(id);
+            var note = await _noteRepository.GetByIdAsync(id);
             if (note == null) return NotFound();
 
             var client = new HttpClient();
             var requestBody = new
             {
-                model = "deepseek-r1:14b",
+                model = "llama3.2",
                 prompt = $"Şu metni kısaca özetle: {note.Content}",
                 stream = false
             };
@@ -83,7 +79,5 @@ namespace NotesAPI.Controllers
 
             return Ok(new { noteId = id, summary });
         }
-
-
     }
 }

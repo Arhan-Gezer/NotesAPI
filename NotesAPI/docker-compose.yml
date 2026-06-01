@@ -5,6 +5,7 @@ services:
       - "8080:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=db;Database=NotesDB;User Id=sa;Password=NotesAPI_123!;TrustServerCertificate=True
     depends_on:
       - db
 
