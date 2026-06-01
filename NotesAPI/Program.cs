@@ -52,7 +52,7 @@ builder.Services.AddAuthentication("Bearer")
     });
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+   options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")!));
 
 builder.Services.AddQuartz(q =>
 {
@@ -73,10 +73,24 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
+    var retries = 10;
+    while (retries > 0)
+    {
+        try
+        {
+            db.Database.Migrate();
+            break;
+        }
+        catch
+        {
+            retries--;
+            Console.WriteLine($"SQL Server hazýr deðil, bekleniyor... ({retries} deneme kaldý)");
+            Thread.Sleep(3000);
+        }
+    }
 }
 
-    app.UseSwagger();
+app.UseSwagger();
     app.UseSwaggerUI();
 
 
