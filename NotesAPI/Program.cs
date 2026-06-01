@@ -4,9 +4,16 @@ using Quartz;
 using NotesAPI.Jobs;
 using NotesAPI.Repositories;
 using Microsoft.Extensions.Options;
+using Serilog;
 
 
 var builder = WebApplication.CreateBuilder(args);
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .WriteTo.File("logs/notesapi.txt", rollingInterval: RollingInterval.Day)
+    .CreateLogger();
+
+builder.Host.UseSerilog();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
